@@ -1,165 +1,4 @@
-https://repl.it/@DanGreff1/SyncTest2#index.js
-
-
-/**
- * API documentation
- *
- * https://lodash.com/docs/4.17.15
- * https://www.npmjs.com/package/nedb
- * https://github.com/bajankristof/nedb-promises
- * https://www.npmjs.com/package/await-the#api-reference
- */
-
-const Datastore = require('nedb-promises');
-const _ = require('lodash');
-const the = require('await-the');
-
-// The source database to sync updates from
-let sourceDb = new Datastore({
-  inMemoryOnly: true,
-  timestampData: true
-});
-
-// The target database that sendEvents() will write too
-let targetDb = new Datastore({
-  inMemoryOnly: true,
-  timestampData: true
-});
-
-
-let TOTAL_RECORDS;
-const load = async () => {
-  // Add some documents to the collection
-  await sourceDb.insert({ name : 'GE', owner: 'test', amount: 1000000 });
-  await the.wait(300);
-  await sourceDb.insert({ name : 'Exxon', owner: 'test2', amount: 5000000 });
-  await the.wait(300);
-  await sourceDb.insert({ name : 'Google', owner: 'test3', amount: 5000001 });
-
-  TOTAL_RECORDS = 3;
-}
-
-let EVENTS_SENT = 0;
-/**
- * Api to send each document to in order to sync
- */
-const sendEvent = data => {
-  EVENTS_SENT += 1;
-  console.log('event being sent: ');
-  console.log(data);
-
-
-  //todo - bonus: write data to targetDb
-  //await sourceDb.insert(data);
-};
-
-// Find and update an existing document
-const touch = async name => {
-  await sourceDb.update({ name }, { $set: { owner: 'test4' } });
-};
-
-const dump = async name => {
-  const record = await sourceDb.findOne( { name });
-  console.log(record);
-};
-
-/**
- * Get all records out of the database and send them using
- * 'sendEvent()'
- */
-const syncAllNoLimit = async () => {
-
-}
-
-/**
- * Sync up to the provided limit of records. Data returned from
- * this function will be provided on the next call as the data
- * argument
- */
-const syncWithLimit = async (limit, data) => {
-  return data;
-}
-
-/**
- * Synchronize in given batch sizes.  This is needed to get around
- * limits most APIs have on result sizes.
- */
-const syncAllSafely = async (batchSize, data) => {
-
-  // Example implementation
-  if (_.isNil(data)) {
-    data = {}
-  }
-  data.lastResultSize = -1;
-  await the.while(
-    () => data.lastResultSize != 0,
-    async () => {
-      data = await syncWithLimit(batchSize, data);
-    });
-
-  return data;
-}
-
-/**
- * Sync changes since the last time the function was called with
- * with the passed in data
- */
-const syncNewChanges = async data => {
-  return data;
-}
-
-
-/**
- * Implement function to fully sync of the database and then
- * keep polling for changes.
- */
-const synchronize = async () => {
-}
-
-
-
-const runTest = async () => {
-  await load();
-
-  await dump('GE');
-
-  EVENTS_SENT = 0;
-  await syncAllNoLimit();
-
-  if (EVENTS_SENT === TOTAL_RECORDS) {
-    console.log('1. synchronized correct number of events')
-  }
-
-  EVENTS_SENT = 0;
-  let data = await syncAllSafely(1);
-
-  if (EVENTS_SENT === TOTAL_RECORDS) {
-    console.log('2. synchronized correct number of events')
-  }
-
-  // Makes some updates and then sync just the changed files
-  EVENTS_SENT = 0;
-  await the.wait(300);
-  await touch('GE');
-  await syncNewChanges(1, data);
-
-  if (EVENTS_SENT === 1) {
-    console.log('3. synchronized correct number of events')
-  }
-
-
-}
-
-
-runTest();
-
-
-
-
-
-
-
-
+// https://repl.it/@DanGreff1/SyncTest2#index.js
 
 
 /**
@@ -207,8 +46,8 @@ let EVENTS_SENT = 0;
  */
 const sendEvent = async eventData => {
   EVENTS_SENT += 1;
-  console.log('event being sent: ');
-  console.log(eventData);
+  // console.log('event being sent: ');
+  // console.log('event data', eventData);
 
   // put an if statement to see if the event type is an insert or an update 
 
@@ -225,7 +64,8 @@ const sendEvent = async eventData => {
 
 // Find and update an existing document
 const touch = async name => {
-  await sourceDb.update({ name }, { $set: { owner: 'test4' } });
+  // { name } is the same thing as { name: name } which is a part of destructuring
+  await sourceDb.update({ name }, { $set: { owner: 'test4' } }); //does an update on source db, i have to find a record to update; 1) a way to find the filter 2) change what property of those records and what are u going to change it to?  
 };
 
 const dump = async name => {
@@ -239,11 +79,11 @@ const dump = async name => {
  */
 const syncAllNoLimit = async () => {
   // divya's notes: synching everything from source dB to target dB; first step - get all records from source dB 
-  const allDocuments = await sourceDb.find({});
+  const allDocuments = await sourceDb.find({}); 
   console.log("syncAllNoLimit", allDocuments);
   allDocuments.forEach( document => {
       const eventData = {type: "insert", document: document}
-      sendEvent(eventData)
+      sendEvent(eventData) //sendEvent does the actual synching so ill need to call it later
   })
 }
 
@@ -253,6 +93,14 @@ const syncAllNoLimit = async () => {
  * argument
  */
 const syncWithLimit = async (limit, data) => {
+  const documents = await sourceDb.find({}).skip(data.skip).limit(limit); //start with data.skip bc we want to start with 0 but aftewards i will increment by batch size 
+  // documents is an array of documents from dB returned by the find call 
+  data.lastResultSize = documents.length
+  documents.forEach( document => { //documents is the array i want to for each on
+    const eventData = {type: "insert", document: document}
+    sendEvent(eventData) //sendEvent does the actual synching & this is where i called it
+})
+  console.log('synced this many documents:', documents.length, limit, data)
   return data;
 }
 
@@ -261,16 +109,19 @@ const syncWithLimit = async (limit, data) => {
  * limits most APIs have on result sizes.
  */
 const syncAllSafely = async (batchSize, data) => {
-
+// batchSize tells me how many batches i want to look at, at a time, from the source dB, implement limit on batchsize; did a skip, to move to the next batch. the batch size is going to be 1 but skip is going to get bigger; and it would have to go up the same size as the batch size
   // Example implementation
   if (_.isNil(data)) {
     data = {}
   }
   data.lastResultSize = -1;
-  await the.while(
+  data.skip = 0; // let skip = 0 makes a new variable whereas data.skip creates a property on the object data 
+  await the.while( // while the data is not equal to 0, do the sync w limit, 
     () => data.lastResultSize != 0, 
     async () => {
-      data = await syncWithLimit(batchSize, data);
+      data = await syncWithLimit(batchSize, data); //syncWithLimit is called over and over till everything is gone through 
+      data.skip += batchSize //this went after bc it was "off by 1", not before 
+      console.log('inside while loop data.lastResultSize', data.lastResultSize)
     });
   
   return data;
@@ -300,7 +151,7 @@ const runTest = async () => {
   await dump('GE');
 
   EVENTS_SENT = 0;
-  await syncAllNoLimit();
+  await syncAllNoLimit(); //this copies everything from source dB to target dB at once but then later, it does it again 
   // all of them at once 
 
   if (EVENTS_SENT === TOTAL_RECORDS) {
@@ -308,12 +159,15 @@ const runTest = async () => {
   }
 
   EVENTS_SENT = 0;
-  let data = await syncAllSafely(1); 
+  await targetDb.remove({}, { multi: true })
+  let data = await syncAllSafely(1); // this is where it copies all records AGAIN from source to target
   // div's notes: do this at the batch size, in this case the line before says 1, so its 1 at a time 
 
+  console.log('Events & Records:',EVENTS_SENT, TOTAL_RECORDS)
   if (EVENTS_SENT === TOTAL_RECORDS) {
     console.log('2. synchronized correct number of events')
   }
+
 
   // Makes some updates and then sync just the changed files
   EVENTS_SENT = 0;

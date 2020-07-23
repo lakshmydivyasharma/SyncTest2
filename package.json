@@ -1,0 +1,25 @@
+{
+  "name": "synctest2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "insight_squared.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lakshmydivyasharma/SyncTest2.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lakshmydivyasharma/SyncTest2/issues"
+  },
+  "homepage": "https://github.com/lakshmydivyasharma/SyncTest2#readme",
+  "dependencies": {
+    "await-the": "^4.3.1",
+    "lodash": "^4.17.19",
+    "nedb": "^1.8.0",
+    "nedb-promises": "^4.0.3"
+  }
+}
