@@ -53,9 +53,10 @@ const sendEvent = async eventData => {
 
   if(eventData.type === "insert"){
     //todo - bonus: write data to targetDb
-    await targetDb.insert(eventData.document);
+    await targetDb.insert(eventData.document); //takes the event data.document and inserts it
   } else if(eventData.type === "update"){
     // UPDATE THE DOCUMENT
+    targetDb.update({ _id: eventData.document._id }, { $set: { name: eventData.document.name, owner: eventData.document.owner, amount: eventData.document.amount }, }, { multi: false })
   } else{
     // if it isn't an insert or update, then display bug information
     console.error("invalid event data type", eventData.type)
@@ -101,6 +102,7 @@ const syncWithLimit = async (limit, data) => {
     sendEvent(eventData) //sendEvent does the actual synching & this is where i called it
 })
   console.log('synced this many documents:', documents.length, limit, data)
+  data.timeLastSynced = new Date()
   return data;
 }
 
@@ -123,15 +125,20 @@ const syncAllSafely = async (batchSize, data) => {
       data.skip += batchSize //this went after bc it was "off by 1", not before
       console.log('inside while loop data.lastResultSize', data.lastResultSize)
     });
-
+  
+  data.timeLastSynced = new Date()
   return data;
 }
+
 
 /**
  * Sync changes since the last time the function was called with
  * with the passed in data
  */
-const syncNewChanges = async data => {
+const syncNewChanges = async (batchSize, data) => {
+  const documentsNeedSync = await sourceDb.find({ "updatedAt": { $gt: data.timeLastSynced } }); 
+  console.log(data, documentsNeedSync)
+// create a data event line 54, and then call send event passing that event datta object to it bc that event data object tells send event what to do
   return data;
 }
 
@@ -162,6 +169,7 @@ const runTest = async () => {
   await targetDb.remove({}, { multi: true })
   let data = await syncAllSafely(1); // this is where it copies all records AGAIN from source to target
   //do this at the batch size, in this case the line before says 1, so its 1 at a time
+  console.log('time last synched:', data.timeLastSynced)
 
   console.log('Events & Records:',EVENTS_SENT, TOTAL_RECORDS)
   if (EVENTS_SENT === TOTAL_RECORDS) {
