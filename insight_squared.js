@@ -138,8 +138,12 @@ const syncAllSafely = async (batchSize, data) => {
 const syncNewChanges = async (batchSize, data) => {
   const documentsNeedSync = await sourceDb.find({ "updatedAt": { $gt: data.timeLastSynced } }); 
   console.log(data, documentsNeedSync)
-// create a data event line 54, and then call send event passing that event datta object to it bc that event data object tells send event what to do
-  return data;
+// function sendEvent, i have this list of docs that needed to be synched and i take htose documents and i create this event data object; event data is whats in my send event functoin. make the object and call the send event function with each of the docuemnts ihave with the update. send an event data event for each one of htose docuemnts 
+ // call send event, give it the right type, & pass every
+  documentsNeedSync.forEach( document => {
+  const eventData = {type: "update", document: document}
+  sendEvent(eventData) 
+})
 }
 
 
@@ -148,7 +152,13 @@ const syncNewChanges = async (batchSize, data) => {
  * keep polling for changes.
  */
 const synchronize = async () => {
+  // polling is i set a timeline and every 5 seconds, look at the source dB to see if there is new stuff and then let it run till i manually close it
+  // first one is for sync all
+    syncAllSafely();
+    setTimeout(synchronize, 3000); 
+  // second one is for updates 
 }
+
 
 
 
@@ -192,3 +202,4 @@ const runTest = async () => {
 
 
 runTest();
+synchronize();
