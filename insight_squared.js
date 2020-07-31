@@ -55,16 +55,25 @@ const sendEvent = async eventData => {
   } else if (eventData.type === "update") {
     // UPDATE THE DOCUMENT
     targetDb.update({ _id: eventData.document._id }, { $set: { name: eventData.document.name, owner: eventData.document.owner, amount: eventData.document.amount }, }, { multi: false });
-  } else {
+  } else if(eventData.type === "delete"){
+    //  DELETE THE DOCUMENT
+    targetDb.remove({ name: eventData.document.name }, { multi: false });
+  }
+  else {
     // if it isn't an insert or update, then display bug information
     console.error("invalid event data type", eventData.type);
-  }
+  } 
 };
 
 // Find and update an existing document
 const touch = async name => {
   // { name } is the same thing as { name: name } 
   await sourceDb.update({ name }, { $set: { owner: 'test4' } });
+};
+
+const testDelete = async name => {
+  // { name } is the same thing as { name: name } 
+  await sourceDb.remove({ name }, { multi: false });
 };
 
 const dump = async name => {
@@ -155,9 +164,41 @@ const syncNewChanges = async (data) => {
   });
   // third step -- loop through inserted documents & sync each individual insert
   newDocumentsNeedSync.forEach(document => {
-    const eventData = { type: "insert", document: document } // want to see how event data is used, look at send event next line
-    sendEvent(eventData)
+    const eventData = { type: "insert", document: document } // want to see how event data is used, look at send event next line --- document: document. setting a property called doucment with the value document; it is the element of the array that i am currently processing in the for each loop 
+    sendEvent(eventData) //calls sendEvent with eventData object THIS DOES THE ACTUAL SYNCING 
   });
+  // WRITE THE DELETE FUNCTION HERE
+  //GET ALL DOCUMENTS FROM TARGET DB 
+  const source = await sourceDb.find({}).sort({ name: 1 })
+  const target = await targetDb.find({}).sort({ name: 1 })
+  // create a loop and create i and j variables and increment based on some comparisons. try to figure out how it ends and in this cases we ahve done always ended together have a way for your loop to end. 
+
+  let i = 0;
+  let j = 0;
+
+  while (i < source.length && j < target.length) {
+    console.log("checking delete", source[i].name, target[j].name, i, j)
+    if (source[i].name === target[j].name) {
+      i++
+      j++
+    } else if (source[i].name > target[j].name) {
+      console.log("should remove this element from the target Db", target[j].name)
+      const eventData = { type: "delete", document: target[j] };
+      sendEvent(eventData);
+      j++
+    } else if (source[i].name < target[j].name) {
+      console.log("detected insert that hasn't happened yet", source[i].name)
+      i++
+    }
+  }
+
+  for (; j < target.length; j++) {
+    console.log("should remove this element from the target Db", target[j].name)
+    const eventData = { type: "delete", document: target[j] };
+    sendEvent(eventData);
+  }
+
+
   // recording time last synced in order to know which records have been changed in the future
   data.timeLastSynced = new Date();
   // set last result size = new updates + new inserts 
@@ -234,6 +275,7 @@ const doit = async () => {
   await load(); // load the test records
   setTimeout(touch, 2 * 1000, 'Exxon'); // schedule a test update
   setTimeout(testInsert, 5 * 1000, 'Exxon'); // schedule a test insert
+  setTimeout(testDelete, 3 * 1000, 'Google'); // schedule a test delete
   synchronize(); // sync the complete db and then start polling for new changes
 }
 doit();
