@@ -52,7 +52,8 @@ const sendEvent = async eventData => {
   if (eventData.type === "insert") {
     //todo - bonus: write data to targetDb
     await targetDb.insert(eventData.document); //takes the event data.document and inserts it
-  } else if (eventData.type === "update") {
+  }
+  else if (eventData.type === "update") {
     // UPDATE THE DOCUMENT
     targetDb.update({ _id: eventData.document._id }, { $set: { name: eventData.document.name, owner: eventData.document.owner, amount: eventData.document.amount }, }, { multi: false });
   } else if(eventData.type === "delete"){
@@ -90,10 +91,8 @@ const syncAllNoLimit = async () => {
   const allDocuments = await sourceDb.find({});
   // console.log("syncAllNoLimit", allDocuments);
   // second step -- loop through all documents, sync each individual document
-  allDocuments.forEach(document => {
-    const eventData = { type: "insert", document: document };
+    const eventData = { type: "insert", document: allDocuments }; // change what the event data object looks like
     sendEvent(eventData);
-  })
 }
 
 /**
@@ -149,6 +148,8 @@ const syncAllSafely = async (batchSize, data) => {
  * with the passed in data
  */
 const syncNewChanges = async (data) => {
+  // recording time last synced in order to know which records have been changed in the future
+    data.timeLastSynced = new Date();
   // first step -- find all documents updated after time last synced 
   let updatedNeedSync = await sourceDb.find({ "updatedAt": { $gt: data.timeLastSynced } });
   // keep documents from updatedNeedSync where the updated time stamp is different from created time stamp
@@ -163,10 +164,9 @@ const syncNewChanges = async (data) => {
     sendEvent(eventData);
   });
   // third step -- loop through inserted documents & sync each individual insert
-  newDocumentsNeedSync.forEach(document => {
-    const eventData = { type: "insert", document: document } // want to see how event data is used, look at send event next line --- document: document. setting a property called doucment with the value document; it is the element of the array that i am currently processing in the for each loop 
+    const eventData = { type: "insert", document: newDocumentsNeedSync } // want to see how event data is used, look at send event next line --- document: document. setting a property called doucment with the value document; it is the element of the array that i am currently processing in the for each loop 
     sendEvent(eventData) //calls sendEvent with eventData object THIS DOES THE ACTUAL SYNCING 
-  });
+    
   // WRITE THE DELETE FUNCTION HERE
   //GET ALL DOCUMENTS FROM TARGET DB 
   const source = await sourceDb.find({}).sort({ name: 1 })
@@ -199,8 +199,7 @@ const syncNewChanges = async (data) => {
   }
 
 
-  // recording time last synced in order to know which records have been changed in the future
-  data.timeLastSynced = new Date();
+
   // set last result size = new updates + new inserts 
   data.lastResultSize = updatedNeedSync.length + newDocumentsNeedSync.length;
   return data;
@@ -274,8 +273,14 @@ const runTest = async () => {
 const doit = async () => {
   await load(); // load the test records
   setTimeout(touch, 2 * 1000, 'Exxon'); // schedule a test update
-  setTimeout(testInsert, 5 * 1000, 'Exxon'); // schedule a test insert
+  setTimeout(testInsert, 5 * 1000, 'Exxon'); // schedule a test insert ALSO after exxon, add an owner but that would be in the for loop, throw in an i
   setTimeout(testDelete, 3 * 1000, 'Google'); // schedule a test delete
+  // write a for loop from 1 - 100 with 10 inserts using a hundred inserts. instead of 5 x 1000, make it a random number of miliseconds. from 0 miliseconds to 30 seconds 
+  // each update be the owner to be the i of the for loop
+  // console log would say "updating exxon to owner of 66 which is the 66th scheduled update in the loop"
+  // look for number 66 in logs; miss 1 update and miss the next one. if i have one update that was w the owner at 66; updated tests to owner of 33. 
+  // goal: make sure the source and target are exactly the same 
+  // write a program for console.log; find all test inserts and find matching sync for each one 
   synchronize(); // sync the complete db and then start polling for new changes
 }
 doit();
